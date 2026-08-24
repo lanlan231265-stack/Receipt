@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>台灣發票單據 OCR 記帳助理 (即時拍照與 Excel 匯出)</title>
+  <title>台灣發票單據 OCR 記帳助理 (總額與類別模式)</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
           發票與單據 OCR 記帳助理
         </h1>
         <p class="text-sm text-slate-500 mt-1">
-          拍一張即時辨識顯示一張，支援連續累加與一鍵匯出全數 Excel
+          單據總金額入帳 ‧ 自動歸納類別品名 ‧ 公用事業自動標註計費期間
         </p>
       </div>
 
@@ -59,7 +59,7 @@
           </div>
           <div>
             <h3 class="font-bold text-slate-900">即時拍照辨識</h3>
-            <p class="text-xs text-slate-500 mt-1">拍一張、畫面即時帶入一張明細</p>
+            <p class="text-xs text-slate-500 mt-1">拍一張、畫面即時帶入該張總額明細</p>
           </div>
           <button id="startCameraBtn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition">
             <i data-lucide="video" class="w-4 h-4"></i> 開啟相機鏡頭
@@ -73,7 +73,7 @@
         >
           <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 mb-1"></i>
           <p class="text-slate-700 font-medium text-sm">選擇或拖曳單據檔案 / PDF</p>
-          <p class="text-xs text-slate-400 mt-1">支援批次選檔連續辨識</p>
+          <p class="text-xs text-slate-400 mt-1">支援水電帳單、發票圖檔、PDF</p>
           <input id="fileInput" type="file" multiple accept="image/*,application/pdf" class="hidden" />
         </div>
 
@@ -114,7 +114,7 @@
     <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
-          <h2 class="text-lg font-bold text-slate-900">已辨識所有資料明細</h2>
+          <h2 class="text-lg font-bold text-slate-900">核銷明細彙整</h2>
           <span id="recordCount" class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-medium">0 筆資料</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -140,8 +140,8 @@
           <thead>
             <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
               <th class="p-3 font-semibold">日期</th>
-              <th class="p-3 font-semibold">品名</th>
-              <th class="p-3 font-semibold text-right">金額</th>
+              <th class="p-3 font-semibold">品名 (類別 / 期間)</th>
+              <th class="p-3 font-semibold text-right">金額 (總額)</th>
               <th class="p-3 font-semibold">統編檢查</th>
             </tr>
           </thead>
@@ -178,7 +178,7 @@
     const totalAmountEl = document.getElementById('totalAmount');
     const recordCountEl = document.getElementById('recordCount');
     
-    // 相機相關元件
+    // 相機元件
     const startCameraBtn = document.getElementById('startCameraBtn');
     const closeCameraBtn = document.getElementById('closeCameraBtn');
     const captureBtn = document.getElementById('captureBtn');
@@ -186,7 +186,7 @@
     const videoPreview = document.getElementById('videoPreview');
     const photoCanvas = document.getElementById('photoCanvas');
 
-    // 即時卡片元件
+    // 即時提示元件
     const latestItemCard = document.getElementById('latestItemCard');
     const latestItemText = document.getElementById('latestItemText');
     const latestItemMeta = document.getElementById('latestItemMeta');
@@ -194,7 +194,6 @@
     apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
     apiKeyInput.addEventListener('change', () => localStorage.setItem('gemini_api_key', apiKeyInput.value.trim()));
 
-    // 拖曳上傳
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-blue-50/50'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-500', 'bg-blue-50/50'));
@@ -295,25 +294,32 @@
         const prompt = `你是一位專門處理台灣各類發票、免用統一發票收據、水電瓦斯費、電信通訊費、手寫計程車證明、估價單與各類單據的 OCR 記帳助理。
 
 【核心任務】
-辨識圖片或檔案中的單據內容（若一張圖有多張單據或多個品項請逐筆列出）。
+每張單據請輸出一筆資料（以該張單據的【總金額】入帳，不要拆解個別子細項）。一張圖片若貼有多張獨立單據，請按單據數量輸出對應筆數。
+
+【品名（類別化）與計費期間規則】
+1. 一般發票/收據：品名請自動歸納並撰寫為適當的「會計/報帳類別」（例如：「文具一批」、「餐費」、「差旅費 (計程車)」、「辦公用品一批」、「電腦周邊耗材」等）。
+2. 電費、水費、瓦斯費、電話費/電信費：
+   - 品名必須包含類別與【計費期間】。
+   - 範例格式：「電費 (台電, 計費期間: 2026/06/15-2026/08/14)」、「水費 (自來水, 計費期間: 2026/05-2026/07)」、「通訊電話費 (中華電信, 計費期間: 2026/07)」等。若無精確起迄日則標註帳單月份。
 
 【指定買受人統編核銷規則】
 - 目標統編：${targetTaxId}
 - 若為統一發票（電子發票證明聯、二/三聯式發票）：
   * 買受人統編為 ${targetTaxId} -> status: "✅ 正確"
   * 買受人統編非 ${targetTaxId} 或未打統編 -> status: "❌ 錯誤 (實際統編/未打)"
-- 若為水電費、瓦斯費、電話費/電信費收據、免用統一發票收據、手寫計程車證明、個人領據等「無統編單據或公用事業收費單」：
+- 若為水電費、瓦斯費、電話費收據、免用統一發票收據、手寫計程車證明、個人領據等公用或免用單據：
   * status: "— (免用)" 或 "— (公用事業)"
 
-【欄位解析原則】
-- date: 西元格式「YYYY-MM-DD」（若為水電/電話費請抓取繳費日或計費截止日；若無年份依當年度推算；若無日期則填空字串 ""）。
-- item: 具體品項名稱。例如：電費 (台電)、水費 (自來水)、電話費 (中華電信)、鮮乳、影印紙 (2包) 等。
-- amount: 純阿拉伯數字實付金額（手寫大寫國字或帳單應繳金額自動轉為純數字）。
+【欄位輸出原則】
+- date: 單據開立日期或繳費日期，西元格式「YYYY-MM-DD」（若無年份依當年度推算；若無日期填空字串 ""）。
+- item: 依上述品名規則整理之類別與計費期間。
+- amount: 該張單據之「實付總金額 / 應繳總額」（純阿拉伯數字整數）。
 - status: 依上述核銷規則輸出文字。
 
 請直接回傳 JSON 格式陣列：
 [
-  { "date": "2026-08-24", "item": "品名", "amount": 100, "status": "✅ 正確" }
+  { "date": "2026-08-24", "item": "電費 (台電, 計費期間: 2026/06/15-2026/08/14)", "amount": 3450, "status": "— (公用事業)" },
+  { "date": "2026-08-24", "item": "文具一批", "amount": 520, "status": "✅ 正確" }
 ]`;
 
         const contents = [{
@@ -351,7 +357,7 @@
           latestItemMeta.innerHTML = `<div class="text-emerald-600 font-bold text-base">NT$ ${Number(lastItem.amount).toLocaleString()}</div><div class="text-xs text-slate-500">${lastItem.status}</div>`;
           latestItemCard.classList.remove('hidden');
 
-          showStatus(`成功辨識並新增 ${newItems.length} 筆資料！可繼續拍照或點選下方匯出 Excel。`);
+          showStatus(`成功辨識並新增 ${newItems.length} 張單據總額！可繼續拍照或點選下方匯出 Excel。`);
         } else {
           showStatus('未能從圖片辨識到單據內容，請再拍一張清晰的照片', true);
         }
@@ -412,7 +418,7 @@
       const ws = XLSX.utils.aoa_to_sheet(exportData);
       ws['!cols'] = [
         { wch: 14 },
-        { wch: 30 },
+        { wch: 45 }, // 增加品名欄寬以完整容納計費期間
         { wch: 12 },
         { wch: 22 }
       ];
@@ -421,7 +427,7 @@
       XLSX.utils.book_append_sheet(wb, ws, "全部核銷明細");
 
       const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      XLSX.writeFile(wb, `全部單據核銷明細_${todayStr}.xlsx`);
+      XLSX.writeFile(wb, `單據核銷總表_${todayStr}.xlsx`);
     });
 
     // 複製至 Excel (TSV)
