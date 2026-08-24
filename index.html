@@ -22,7 +22,7 @@
           發票與單據 OCR 記帳助理
         </h1>
         <p class="text-sm text-slate-500 mt-1">
-          單據總金額入帳 ‧ 自動歸納品名類別 ‧ 日期採 YYYY/MM/DD 格式 ‧ 電費/水費/電話費附期間
+          西元日期 YYYY/MM/DD ‧ 單據總金額入帳 ‧ 拍一張即時顯示一張
         </p>
       </div>
 
@@ -296,13 +296,11 @@
 【核心任務】
 每張單據請輸出一筆資料（以該張單據的【總金額】入帳，不要拆解細項）。一張圖片若貼有多張獨立單據，請按單據數量輸出對應筆數。
 
-【品名規則】
-1. 公用事業單據（電費、水費、電話費）：
-   - 品名【只能寫】「電費」、「水費」、「電話費」。
-   - 【嚴禁出現】機構與公司名稱（不要寫台電、台灣電力公司、台水、自來水、自來水公司、中華電信、遠傳、台灣大哥大等）。
-   - 【嚴禁出現】「計費期間：」或「計費期間」等字樣。
-   - 直接在品名後方以括號附上起訖期間（例如：(2026/06/15-2026/08/14)、(2026/05-2026/07) 或 (2026/07)）。
-   - 正確品名輸出範例：
+【品名與期間規則】
+1. 電費、水費、電話費規則：
+   - 只能寫「電費」、「水費」、「電話費」，嚴禁出現機構或公司名稱（不要寫台電、台灣電力公司、台水、自來水公司、中華電信、遠傳、台灣大哥大等）。
+   - 後方直接用括號附上起訖期間，【嚴禁出現「計費期間：」這五個字】。
+   - 格式範例：
      * 電費 (2026/06/15-2026/08/14)
      * 水費 (2026/05-2026/07)
      * 電話費 (2026/07)
@@ -317,7 +315,7 @@
   * status: "— (免用)" 或 "— (公用事業)"
 
 【欄位輸出原則】
-- date: 單據開立日期或繳費日期，西元格式【必須為 YYYY/MM/DD】（例如 2026/08/24。若無年份依當年度推算；若無日期填空字串 ""）。
+- date: 單據開立日期或繳費日期，西元格式「YYYY/MM/DD」（例如 2026/08/24。若無年份依當年度推算；若無日期填空字串 ""）。
 - item: 依上述品名規則整理（例如：「電費 (2026/06/15-2026/08/14)」、「文具一批」）。
 - amount: 該張單據之「實付總金額 / 應繳總額」（純阿拉伯數字整數）。
 - status: 依上述核銷規則輸出文字。
@@ -354,22 +352,16 @@
         const newItems = JSON.parse(rawText);
 
         if (Array.isArray(newItems) && newItems.length > 0) {
-          // 強制標準化日期格式為 YYYY/MM/DD
-          const formattedItems = newItems.map(item => ({
-            ...item,
-            date: item.date ? item.date.replace(/-/g, '/') : ''
-          }));
-
-          records = [...records, ...formattedItems];
+          records = [...records, ...newItems];
           renderTable();
           
           // 更新最新一筆即時卡片
-          const lastItem = formattedItems[formattedItems.length - 1];
+          const lastItem = newItems[newItems.length - 1];
           latestItemText.innerText = `${lastItem.item} (${lastItem.date || '無日期'})`;
           latestItemMeta.innerHTML = `<div class="text-emerald-600 font-bold text-base">NT$ ${Number(lastItem.amount).toLocaleString()}</div><div class="text-xs text-slate-500">${lastItem.status}</div>`;
           latestItemCard.classList.remove('hidden');
 
-          showStatus(`成功辨識並新增 ${formattedItems.length} 張單據總額！可繼續拍照或點選下方匯出 Excel。`);
+          showStatus(`成功辨識並新增 ${newItems.length} 張單據總額！可繼續拍照或點選下方匯出 Excel。`);
         } else {
           showStatus('未能從圖片辨識到單據內容，請再拍一張清晰的照片', true);
         }
