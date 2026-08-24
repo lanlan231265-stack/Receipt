@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>台灣發票單據 OCR 記帳助理</title>
+  <title>台灣發票單據 OCR 記帳助理 (YYYY/MM/DD 格式)</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
           發票與單據 OCR 記帳助理
         </h1>
         <p class="text-sm text-slate-500 mt-1">
-          單據總金額入帳 ‧ 自動歸納品名類別 ‧ 電費/水費/電話費附期間（去機構名與無計費期間字樣）
+          單據總金額入帳 ‧ 自動歸納品名類別 ‧ 日期採 YYYY/MM/DD 格式 ‧ 電費/水費/電話費附期間
         </p>
       </div>
 
@@ -317,15 +317,15 @@
   * status: "— (免用)" 或 "— (公用事業)"
 
 【欄位輸出原則】
-- date: 單據開立日期或繳費日期，西元格式「YYYY-MM-DD」（若無年份依當年度推算；若無日期填空字串 ""）。
+- date: 單據開立日期或繳費日期，西元格式【必須為 YYYY/MM/DD】（例如 2026/08/24。若無年份依當年度推算；若無日期填空字串 ""）。
 - item: 依上述品名規則整理（例如：「電費 (2026/06/15-2026/08/14)」、「文具一批」）。
 - amount: 該張單據之「實付總金額 / 應繳總額」（純阿拉伯數字整數）。
 - status: 依上述核銷規則輸出文字。
 
 請直接回傳 JSON 格式陣列：
 [
-  { "date": "2026-08-24", "item": "電費 (2026/06/15-2026/08/14)", "amount": 3450, "status": "— (公用事業)" },
-  { "date": "2026-08-24", "item": "文具一批", "amount": 520, "status": "✅ 正確" }
+  { "date": "2026/08/24", "item": "電費 (2026/06/15-2026/08/14)", "amount": 3450, "status": "— (公用事業)" },
+  { "date": "2026/08/24", "item": "文具一批", "amount": 520, "status": "✅ 正確" }
 ]`;
 
         const contents = [{
@@ -354,16 +354,22 @@
         const newItems = JSON.parse(rawText);
 
         if (Array.isArray(newItems) && newItems.length > 0) {
-          records = [...records, ...newItems];
+          // 強制標準化日期格式為 YYYY/MM/DD
+          const formattedItems = newItems.map(item => ({
+            ...item,
+            date: item.date ? item.date.replace(/-/g, '/') : ''
+          }));
+
+          records = [...records, ...formattedItems];
           renderTable();
           
           // 更新最新一筆即時卡片
-          const lastItem = newItems[newItems.length - 1];
+          const lastItem = formattedItems[formattedItems.length - 1];
           latestItemText.innerText = `${lastItem.item} (${lastItem.date || '無日期'})`;
           latestItemMeta.innerHTML = `<div class="text-emerald-600 font-bold text-base">NT$ ${Number(lastItem.amount).toLocaleString()}</div><div class="text-xs text-slate-500">${lastItem.status}</div>`;
           latestItemCard.classList.remove('hidden');
 
-          showStatus(`成功辨識並新增 ${newItems.length} 張單據總額！可繼續拍照或點選下方匯出 Excel。`);
+          showStatus(`成功辨識並新增 ${formattedItems.length} 張單據總額！可繼續拍照或點選下方匯出 Excel。`);
         } else {
           showStatus('未能從圖片辨識到單據內容，請再拍一張清晰的照片', true);
         }
@@ -439,28 +445,35 @@
     // 複製至 Excel (TSV)
     document.getElementById('copyExcelBtn').addEventListener('click', () => {
       if (records.length === 0) return;
-      let tsv = `日期\t品名\t金額\t統編檢查\n`;
+      let tsv = `日期	品名	金額	統編檢查
+`;
       let total = 0;
       records.forEach(r => {
         const amt = Number(r.amount) || 0;
         total += amt;
-        tsv += `${r.date || ''}\t${r.item}\t${amt}\t${r.status}\n`;
+        tsv += `${r.date || ''}	${r.item}	${amt}	${r.status}
+`;
       });
-      tsv += `累積總金額\t\t${total}\t\n`;
+      tsv += `累積總金額		${total}	
+`;
       navigator.clipboard.writeText(tsv).then(() => alert('已複製所有明細！可直接在 Excel 中貼上。'));
     });
 
     // 複製 Markdown
     document.getElementById('copyMdBtn').addEventListener('click', () => {
       if (records.length === 0) return;
-      let md = `| 日期 | 品名 | 金額 | 統編檢查 |\n|---|---|---|---|\n`;
+      let md = `| 日期 | 品名 | 金額 | 統編檢查 |
+|---|---|---|---|
+`;
       let total = 0;
       records.forEach(r => {
         const amt = Number(r.amount) || 0;
         total += amt;
-        md += `| ${r.date || ''} | ${r.item} | ${amt} | ${r.status} |\n`;
+        md += `| ${r.date || ''} | ${r.item} | ${amt} | ${r.status} |
+`;
       });
-      md += `\n**累積總金額：${total}**`;
+      md += `
+**累積總金額：${total}**`;
       navigator.clipboard.writeText(md).then(() => alert('已複製 Markdown 格式！'));
     });
 
