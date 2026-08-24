@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>台灣發票單據 OCR 記帳助理 (YYYY/MM/DD 格式)</title>
+  <title>台灣發票單據 OCR 記帳助理</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
           發票與單據 OCR 記帳助理
         </h1>
         <p class="text-sm text-slate-500 mt-1">
-          西元日期 YYYY/MM/DD ‧ 單據總金額入帳 ‧ 拍一張即時顯示一張
+          單據總金額入帳 ‧ 授課鐘點費/臨托費專業解析 ‧ 日期採 YYYY/MM/DD 格式
         </p>
       </div>
 
@@ -72,8 +72,8 @@
           class="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/20 transition-colors rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer text-center"
         >
           <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 mb-1"></i>
-          <p class="text-slate-700 font-medium text-sm">選擇或拖曳單據檔案 / PDF</p>
-          <p class="text-xs text-slate-400 mt-1">支援水電帳單、發票圖檔、PDF</p>
+          <p class="text-slate-700 font-medium text-sm">選擇或拖曳單據檔案 / PDF / 領據</p>
+          <p class="text-xs text-slate-400 mt-1">支援水電帳單、發票、鐘點費/臨托費領據、估價單</p>
           <input id="fileInput" type="file" multiple accept="image/*,application/pdf" class="hidden" />
         </div>
 
@@ -291,39 +291,44 @@
       try {
         const targetTaxId = targetTaxIdInput.value.trim() || '20088708';
 
-        const prompt = `你是一位專門處理台灣各類發票、免用統一發票收據、水電費、電話費、手寫計程車證明、估價單與各類單據的 OCR 記帳助理。
+        const prompt = `你是一位專門處理台灣各類發票、免用統一發票收據、公用事業水電電話費、講座鐘點費/領據、臨托費與各類單據的 OCR 記帳助理。
 
 【核心任務】
-每張單據請輸出一筆資料（以該張單據的【總金額】入帳，不要拆解細項）。一張圖片若貼有多張獨立單據，請按單據數量輸出對應筆數。
+每張單據請輸出一筆資料（以該張單據的【總金額 / 應領金額】入帳，不要拆解細項）。一張圖片若貼有多張獨立單據，請按單據數量輸出對應筆數。
 
-【品名與期間規則】
-1. 電費、水費、電話費規則：
-   - 只能寫「電費」、「水費」、「電話費」，嚴禁出現機構或公司名稱（不要寫台電、台灣電力公司、台水、自來水公司、中華電信、遠傳、台灣大哥大等）。
-   - 後方直接用括號附上起訖期間，【嚴禁出現「計費期間：」這五個字】。
-   - 格式範例：
-     * 電費 (2026/06/15-2026/08/14)
-     * 水費 (2026/05-2026/07)
-     * 電話費 (2026/07)
-2. 一般發票/收據：品名請自動歸納並撰寫為適當的報帳類別（例如：「文具一批」、「餐費」、「差旅費 (計程車)」、「辦公用品一批」等）。
+【品名與金額解析規則】
+1. 授課鐘點費（講師費/演講費領據）：
+   - 品名格式必須為：授課鐘點費 (領款人姓名 - 具體事由或課程名稱)
+   - 金額：請辨識該單據之「應領金額」（毛額/總額），若無則填實領金額。
+   - 範例：授課鐘點費 (王小明 - 兒少照護實務講座)
+2. 臨托費（臨時托育費用/陪伴領據）：
+   - 品名格式必須為：臨托費 (領款人姓名)
+   - 金額：請精準辨識「應領金額」（若有預扣稅費仍以應領總額為準）。
+   - 範例：臨托費 (陳美麗)
+3. 公用事業單據（電費、水費、電話費）：
+   - 品名【只能寫】「電費」、「水費」、「電話費」，嚴禁出現台電、自來水、中華電信等公司機構名，且【嚴禁出現】「計費期間：」字樣。
+   - 直接以括號附上期間。例如：電費 (2026/06/15-2026/08/14)、水費 (2026/05-2026/07)、電話費 (2026/07)
+4. 一般發票/收據：品名請自動歸納並撰寫為適當的報帳類別（例如：「文具一批」、「餐費」、「差旅費 (計程車)」、「辦公用品一批」等）。
 
 【指定買受人統編核銷規則】
 - 目標統編：${targetTaxId}
 - 若為統一發票（電子發票證明聯、二/三聯式發票）：
   * 買受人統編為 ${targetTaxId} -> status: "✅ 正確"
   * 買受人統編非 ${targetTaxId} 或未打統編 -> status: "❌ 錯誤 (實際統編/未打)"
-- 若為水電費、電話費收據、免用統一發票收據、手寫計程車證明、個人領據等公用或免用單據：
-  * status: "— (免用)" 或 "— (公用事業)"
+- 若為個人領據（授課鐘點費、臨托費）、水電費、電話費收據、免用統一發票收據、手寫計程車證明等無統編單據：
+  * status: "— (免用)" 或 "— (個人領據)" 或 "— (公用事業)"
 
 【欄位輸出原則】
-- date: 單據開立日期或繳費日期，西元格式「YYYY/MM/DD」（例如 2026/08/24。若無年份依當年度推算；若無日期填空字串 ""）。
-- item: 依上述品名規則整理（例如：「電費 (2026/06/15-2026/08/14)」、「文具一批」）。
-- amount: 該張單據之「實付總金額 / 應繳總額」（純阿拉伯數字整數）。
+- date: 單據開立日期、活動日期或繳費日期，西元格式【必須為 YYYY/MM/DD】（例如 2026/08/24。若無年份依當年度推算；若無日期填空字串 ""）。
+- item: 依上述品名規則整理。
+- amount: 該張單據之「實付總額 / 應領總額」（純阿拉伯數字整數）。
 - status: 依上述核銷規則輸出文字。
 
 請直接回傳 JSON 格式陣列：
 [
-  { "date": "2026/08/24", "item": "電費 (2026/06/15-2026/08/14)", "amount": 3450, "status": "— (公用事業)" },
-  { "date": "2026/08/24", "item": "文具一批", "amount": 520, "status": "✅ 正確" }
+  { "date": "2026/08/24", "item": "授課鐘點費 (王小明 - 兒少照護實務講座)", "amount": 2000, "status": "— (個人領據)" },
+  { "date": "2026/08/24", "item": "臨托費 (陳美麗)", "amount": 1800, "status": "— (個人領據)" },
+  { "date": "2026/08/24", "item": "電費 (2026/06/15-2026/08/14)", "amount": 3450, "status": "— (公用事業)" }
 ]`;
 
         const contents = [{
@@ -352,16 +357,20 @@
         const newItems = JSON.parse(rawText);
 
         if (Array.isArray(newItems) && newItems.length > 0) {
-          records = [...records, ...newItems];
+          const formattedItems = newItems.map(item => ({
+            ...item,
+            date: item.date ? item.date.replace(/-/g, '/') : ''
+          }));
+
+          records = [...records, ...formattedItems];
           renderTable();
           
-          // 更新最新一筆即時卡片
-          const lastItem = newItems[newItems.length - 1];
+          const lastItem = formattedItems[formattedItems.length - 1];
           latestItemText.innerText = `${lastItem.item} (${lastItem.date || '無日期'})`;
           latestItemMeta.innerHTML = `<div class="text-emerald-600 font-bold text-base">NT$ ${Number(lastItem.amount).toLocaleString()}</div><div class="text-xs text-slate-500">${lastItem.status}</div>`;
           latestItemCard.classList.remove('hidden');
 
-          showStatus(`成功辨識並新增 ${newItems.length} 張單據總額！可繼續拍照或點選下方匯出 Excel。`);
+          showStatus(`成功辨識並新增 ${formattedItems.length} 張單據明細！可繼續拍照或點選下方匯出 Excel。`);
         } else {
           showStatus('未能從圖片辨識到單據內容，請再拍一張清晰的照片', true);
         }
@@ -416,13 +425,12 @@
         exportData.push([r.date || '', r.item, amt, r.status]);
       });
 
-      // 結算列
       exportData.push(["累積總金額", "", total, ""]);
 
       const ws = XLSX.utils.aoa_to_sheet(exportData);
       ws['!cols'] = [
         { wch: 14 },
-        { wch: 40 },
+        { wch: 45 },
         { wch: 12 },
         { wch: 22 }
       ];
@@ -437,35 +445,28 @@
     // 複製至 Excel (TSV)
     document.getElementById('copyExcelBtn').addEventListener('click', () => {
       if (records.length === 0) return;
-      let tsv = `日期	品名	金額	統編檢查
-`;
+      let tsv = `日期\t品名\t金額\t統編檢查\n`;
       let total = 0;
       records.forEach(r => {
         const amt = Number(r.amount) || 0;
         total += amt;
-        tsv += `${r.date || ''}	${r.item}	${amt}	${r.status}
-`;
+        tsv += `${r.date || ''}\t${r.item}\t${amt}\t${r.status}\n`;
       });
-      tsv += `累積總金額		${total}	
-`;
+      tsv += `累積總金額\t\t${total}\t\n`;
       navigator.clipboard.writeText(tsv).then(() => alert('已複製所有明細！可直接在 Excel 中貼上。'));
     });
 
     // 複製 Markdown
     document.getElementById('copyMdBtn').addEventListener('click', () => {
       if (records.length === 0) return;
-      let md = `| 日期 | 品名 | 金額 | 統編檢查 |
-|---|---|---|---|
-`;
+      let md = `| 日期 | 品名 | 金額 | 統編檢查 |\n|---|---|---|---|\n`;
       let total = 0;
       records.forEach(r => {
         const amt = Number(r.amount) || 0;
         total += amt;
-        md += `| ${r.date || ''} | ${r.item} | ${amt} | ${r.status} |
-`;
+        md += `| ${r.date || ''} | ${r.item} | ${amt} | ${r.status} |\n`;
       });
-      md += `
-**累積總金額：${total}**`;
+      md += `\n**累積總金額：${total}**`;
       navigator.clipboard.writeText(md).then(() => alert('已複製 Markdown 格式！'));
     });
 
